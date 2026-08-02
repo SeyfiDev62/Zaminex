@@ -1,0 +1,67 @@
+import re
+
+from django.utils.encoding import force_str
+from rest_framework.views import exception_handler
+
+
+_EXACT_TRANSLATIONS = {
+    "Authentication credentials were not provided.": "برای دسترسی ابتدا وارد حساب کاربری خود شوید.",
+    "Invalid username/password.": "نام کاربری یا رمز عبور واردشده صحیح نیست.",
+    "Not found.": "موردی یافت نشد.",
+    "Permission denied.": "شما اجازه انجام این عملیات را ندارید.",
+    "You do not have permission to perform this action.": "شما اجازه انجام این عملیات را ندارید.",
+    "You do not have permission to access this page.": "شما اجازه دسترسی به این صفحه را ندارید.",
+    "This field is required.": "این فیلد الزامی است.",
+    "This field may not be blank.": "این فیلد نمی‌تواند خالی باشد.",
+    "This field may not be null.": "این فیلد نمی‌تواند بدون مقدار باشد.",
+    "A valid integer is required.": "یک عدد صحیح معتبر وارد کنید.",
+    "A valid number is required.": "یک عدد معتبر وارد کنید.",
+    "Enter a valid email address.": "نشانی ایمیل معتبر نیست.",
+    "Enter a valid URL.": "نشانی اینترنتی معتبر نیست.",
+    "Enter a valid date.": "تاریخ معتبر وارد کنید.",
+    "Enter a valid date/time.": "تاریخ و زمان معتبر وارد کنید.",
+    "Invalid date.": "تاریخ معتبر نیست.",
+    "Invalid datetime.": "تاریخ و زمان معتبر نیست.",
+    "No file was submitted.": "فایلی ارسال نشده است.",
+    "The submitted data was not a file. Check the encoding type on the form.": "داده ارسال‌شده فایل معتبر نیست.",
+    "The submitted file is empty.": "فایل ارسال‌شده خالی است.",
+    "Upload a valid image. The file you uploaded was either not an image or a corrupted image.": "تصویر معتبر بارگذاری کنید. فایل ارسالی تصویر نیست یا خراب است.",
+    "Ensure this field has no more than 255 characters.": "طول این فیلد نباید بیشتر از ۲۵۵ کاراکتر باشد.",
+}
+
+_PATTERN_TRANSLATIONS = [
+    (re.compile(r'^"(?P<value>.+)" is not a valid choice\.$'), lambda m: f"«{m.group('value')}» گزینه معتبری نیست."),
+    (re.compile(r"^Invalid pk \"(?P<value>.+)\" - object does not exist\.$"), lambda m: "گزینه انتخاب‌شده وجود ندارد."),
+    (re.compile(r"^Incorrect type\. Expected pk value, received (?P<value>.+)\.$"), lambda m: "نوع مقدار ارسالی برای شناسه معتبر نیست."),
+    (re.compile(r"^Ensure this value is greater than or equal to (?P<value>.+)\.$"), lambda m: f"این مقدار باید بزرگ‌تر یا مساوی {m.group('value')} باشد."),
+    (re.compile(r"^Ensure this value is less than or equal to (?P<value>.+)\.$"), lambda m: f"این مقدار باید کوچک‌تر یا مساوی {m.group('value')} باشد."),
+    (re.compile(r"^Ensure this field has no more than (?P<value>\d+) characters\.$"), lambda m: f"طول این فیلد نباید بیشتر از {m.group('value')} کاراکتر باشد."),
+    (re.compile(r"^Ensure this field has at least (?P<value>\d+) characters\.$"), lambda m: f"طول این فیلد باید حداقل {m.group('value')} کاراکتر باشد."),
+    (re.compile(r"^Datetime has wrong format\. Use one of these formats instead: (?P<value>.+)\.$"), lambda m: "فرمت تاریخ و زمان معتبر نیست."),
+    (re.compile(r"^Date has wrong format\. Use one of these formats instead: (?P<value>.+)\.$"), lambda m: "فرمت تاریخ معتبر نیست."),
+]
+
+
+def _translate_message(value):
+    if isinstance(value, dict):
+        return {key: _translate_message(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_translate_message(item) for item in value]
+
+    text = force_str(value)
+    if text in _EXACT_TRANSLATIONS:
+        return _EXACT_TRANSLATIONS[text]
+
+    for pattern, replacement in _PATTERN_TRANSLATIONS:
+        match = pattern.match(text)
+        if match:
+            return replacement(match)
+
+    return text
+
+
+def persian_exception_handler(exc, context):
+    response = exception_handler(exc, context)
+    if response is not None:
+        response.data = _translate_message(response.data)
+    return response

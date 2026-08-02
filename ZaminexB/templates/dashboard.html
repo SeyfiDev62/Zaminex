@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | CRM{% endblock %}
+
+{% block content %}
+    <div id="root"></div>
+    {{ initial_data|json_script:"initial-data" }}
+
+    <script id="initial-data" type="application/json">
+        {{ initial_data|safe }}
+    </script>
+
+{% endblock %}
